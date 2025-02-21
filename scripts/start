@@ -1,0 +1,64 @@
+#!/bin/bash
+
+RETRY_WAIT=10
+
+wait_for_pod() {
+    local pod_name="$1"
+    while ! kubectl get pods | grep "$pod_name" | grep Running > /dev/null; do
+        echo "Awaiting $pod_name..."
+        sleep $RETRY_WAIT
+    done
+    echo "$pod_name ready!"
+}
+
+clear
+: > log.txt
+
+# Initialize cluster and namespace
+kind create cluster --config manifests/0-kind-config.yml
+kubectl create namespace kafka
+kubectl config set-context --current --namespace kafka
+
+# Provision Kafka and Schema Registry resources
+kubectl apply -f manifests/1-kafka.yml
+kubectl apply -f manifests/2-schema-registry.yml
+
+# Await readiness...
+wait_for_pod "kafka"
+wait_for_pod "registry-schema"
+
+# Build and load Docker images
+docker build -t confluent-producer:1.0.0 -f producer/Dockerfile .
+kind load docker-image confluent-producer:1.0.0
+docker build -t kafka-connect-postgres:1.0.0 -f connect/Dockerfile .
+kind load docker-image kafka-connect-postgres:1.0.0
+
+# Provision Kafka Connect, PostgreSQL, and pgAdmin resources
+kubectl apply -f manifests/3-connect.yml
+kubectl apply -f manifests/4-postgres.yml
+kubectl apply -f manifests/5-pgadmin.yml
+
+wait_for_pod "kafka-connect"
+wait_for_pod "postgres"
+wait_for_pod "pgadmin"
+
+# Port-forward necessary services
+./scripts/port-forward $RETRY_WAIT &
+
+# POST sink connector configurations
+sleep 10s
+until curl -X POST -H "Content-Type: application/json" --data @configs/post-sink-connector.json http://localhost:8083/connectors; do
+    echo "Retry POST sink-connector in $RETRY_WAIT seconds..."
+    sleep $RETRY_WAIT
+done
+
+# Provision producer resources
+kubectl apply -f manifests/6-producer.yml
+
+wait_for_pod "confluent-producer"
+
+echo "Suited and booted, Let's do it! 🚀"
+
+### OTHER IMPORTANT COMMANDS ###
+# Update connector configs: curl -X PUT -H "Content-Type: application/json" --data @configs/put-sink-connector.json http://localhost:8083/connectors/postgres-sink-connector/config
+# Soft & hard delete registered schema: curl -X DELETE 'http://localhost:8081/subjects/loggings-value?permanent=false' && curl -X DELETE 'http://localhost:8081/subjects/loggings-value?permanent=true'

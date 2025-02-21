@@ -1,0 +1,4 @@
+#!/bin/bash
+
+kind delete cluster
+ps aux | grep port-forward | grep -o -E '\s\d+\s' | xargs kill >> log.txt 2>&1
