@@ -57,7 +57,7 @@ kubectl apply -f manifests/6-producer.yml
 
 wait_for_pod "confluent-producer"
 
-echo "Suited and booted, Let's do it! 🚀"
+echo "Suited and booted. Let's do it! 🚀"
 
 ### OTHER IMPORTANT COMMANDS ###
 # Update connector configs: curl -X PUT -H "Content-Type: application/json" --data @configs/put-sink-connector.json http://localhost:8083/connectors/postgres-sink-connector/config
