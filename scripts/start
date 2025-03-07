@@ -72,8 +72,8 @@ sleep 10s
 docker build -t spark-pg:1.0.0 -f spark/Dockerfile .
 kind load docker-image spark-pg:1.0.0
 kubectl apply -f manifests/7-spark.yml
-wait_for_pod "spark-pi-python-driver"
-kubectl logs spark-pi-python-driver
+wait_for_pod "spark-python-driver"
+kubectl logs spark-python-driver
 
 echo "Suited and booted. Let's do it! 🚀"
 
