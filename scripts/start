@@ -4,7 +4,7 @@ RETRY_WAIT=10
 
 wait_for_pod() {
     local pod_name="$1"
-    while ! kubectl get pods | grep "$pod_name" | grep Running > /dev/null; do
+    while ! kubectl get pods | grep "$pod_name" | grep -E "Running|Completed" > /dev/null; do
         echo "Awaiting $pod_name..."
         sleep $RETRY_WAIT
     done
@@ -56,6 +56,24 @@ done
 kubectl apply -f manifests/6-producer.yml
 
 wait_for_pod "confluent-producer"
+
+# Helm Kubeflow Spark Operator
+helm repo add spark-operator https://kubeflow.github.io/spark-operator --force-update
+helm repo update
+helm install spark-operator spark-operator/spark-operator \
+    --namespace spark-operator --create-namespace \
+    --set "spark.jobNamespaces={kafka}" \
+    --wait  # MUST HAVE `--set "spark.jobNamespaces={kafka}"`
+
+# Give producers time to emit some events
+sleep 10s
+
+# Deploy Spark Job
+docker build -t spark-pg:1.0.0 -f spark/Dockerfile .
+kind load docker-image spark-pg:1.0.0
+kubectl apply -f manifests/7-spark.yml
+wait_for_pod "spark-pi-python-driver"
+kubectl logs spark-pi-python-driver
 
 echo "Suited and booted. Let's do it! 🚀"
 
