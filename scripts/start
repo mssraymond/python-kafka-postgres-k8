@@ -33,11 +33,13 @@ kind load docker-image confluent-producer:1.0.0
 docker build -t kafka-connect-postgres:1.0.0 -f connect/Dockerfile .
 kind load docker-image kafka-connect-postgres:1.0.0
 
-# Provision Kafka Connect, PostgreSQL, and pgAdmin resources
+# Provision Kafka UI, Kafka Connect, PostgreSQL, and pgAdmin resources
+kubectl apply -f manifests/1.2-kafka-ui.yml  # localhost:5051 via port-forward
 kubectl apply -f manifests/3-connect.yml
 kubectl apply -f manifests/4-postgres.yml
-kubectl apply -f manifests/5-pgadmin.yml
+kubectl apply -f manifests/5-pgadmin.yml  # localhost:5050 via port-forward
 
+wait_for_pod "kafka-ui"
 wait_for_pod "kafka-connect"
 wait_for_pod "postgres"
 wait_for_pod "pgadmin"
